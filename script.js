@@ -1,6 +1,6 @@
 /* ============================================================
    OCEAN PHARMACY — Branch Locator · script.js
-   Live data from Google Sheets via opensheet.elk.sh
+   v2.1 — Anti-cache · Live Refresh · Column Aliasing · Debug
    ============================================================ */
 
 'use strict';
@@ -8,7 +8,24 @@
 /* ── Sheet API ───────────────────────────────────────────── */
 const SHEET_URL = 'https://opensheet.elk.sh/1grir_i5EwEXcSqES2Ay2IfF0BomtZ12vp-_8ngRMa7E/Sheet1';
 
-/* ── City Coordinates Lookup ─────────────────────────────── */
+/* ── Column Aliases — handles any casing/naming from sheet ── */
+// Each key = what we call it internally, values = possible sheet header names
+const COL = {
+  store_code:   ['Store code', 'store_code', 'StoreCode', 'store code'],
+  business_name:['Business name', 'business_name', 'BusinessName', 'name', 'Name'],
+  address1:     ['Address line 1', 'address1', 'Address1', 'address line 1'],
+  address2:     ['Address line 2', 'address2', 'Address2', 'address line 2'],
+  city:         ['Locality', 'city', 'City', 'locality'],
+  country:      ['Country / Region', 'country', 'Country', 'region'],
+  phone:        ['Primary phone', 'phone', 'Phone', 'primary_phone', 'mobile'],
+  delivery:     ['delevery', 'delivery', 'Delivery', 'Delevery', 'has_delivery'],
+  whatsapp:     ['whats app link', 'whatsapp', 'WhatsApp', 'whatsapp_link', 'whats_app_link'],
+  maps:         ['google maps location', 'maps', 'Maps', 'google_maps_link', 'Google Maps', 'map_link'],
+  lat:          ['Latitude', 'latitude', 'lat', 'Lat'],
+  lng:          ['Longitude', 'longitude', 'lng', 'Lng', 'long', 'Long'],
+};
+
+/* ── City Fallback Coordinates ───────────────────────────── */
 const CITY_COORDS = {
   'الرياض':            { lat: 24.7136,  lng: 46.6753 },
   'الرياص':            { lat: 24.7136,  lng: 46.6753 },
@@ -34,25 +51,26 @@ const CITY_COORDS = {
 
 /* ── Brand Meta ──────────────────────────────────────────── */
 const BRAND_META = {
-  'صيدلية أوشن':     { color: '#00c896', icon: '⚕' },
-  'عناية أوشن':      { color: '#00a8e0', icon: '🌿' },
+  'صيدلية أوشن':      { color: '#00c896', icon: '⚕' },
+  'عناية أوشن':       { color: '#00a8e0', icon: '🌿' },
   'السعودية الرائدة': { color: '#e0a800', icon: '🏥' },
 };
 
-/* ── State ───────────────────────────────────────────────── */
+/* ── App State ───────────────────────────────────────────── */
 let state = {
-  branches: [],
-  userLat: null,
-  userLng: null,
-  located: false,
-  sortMode: 'default',
-  query: '',
+  branches:         [],
+  branchesWithDist: [],
+  userLat:    null,
+  userLng:    null,
+  located:    false,
+  sortMode:   'default',
+  query:      '',
   activeBranch: null,
-  branchesWithDist: []
+  lastLoaded:   null,   // Date object of last successful fetch
 };
 
-/* ── DOM ─────────────────────────────────────────────────── */
-const $ = id => document.getElementById(id);
+/* ── DOM refs ────────────────────────────────────────────── */
+const $  = id => document.getElementById(id);
 const el = {
   overlay:       $('loadingOverlay'),
   skeleton:      $('skeletonGrid'),
@@ -83,45 +101,144 @@ const el = {
   modalWhatsapp: $('modalWhatsapp'),
   modalMaps:     $('modalMaps'),
   modalCover:    $('modalCover'),
+  lastUpdated:   $('lastUpdated'),    // injected below if missing
+  refreshBtn:    $('refreshBtn'),     // injected below if missing
 };
 
-/* ── Normalize Sheet Row ─────────────────────────────────── */
+/* ── Inject Refresh Button + Last-Updated bar if not in HTML  */
+(function injectRefreshUI() {
+  // Last-updated label — goes inside the status bar
+  if (!el.lastUpdated) {
+    const span = document.createElement('span');
+    span.id = 'lastUpdated';
+    span.style.cssText = 'margin-right:auto;font-size:0.78rem;opacity:0.7;';
+    el.statusInner && el.statusInner.appendChild(span);
+    el.lastUpdated = span;
+  }
+
+  // Refresh button — inject next to sort chips
+  if (!el.refreshBtn) {
+    const btn = document.createElement('button');
+    btn.id = 'refreshBtn';
+    btn.className = 'refresh-btn';
+    btn.innerHTML = `
+      <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15">
+        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      تحديث البيانات`;
+    el.refreshBtn = btn;
+
+    // Append to section-header sort-chips row
+    const chips = document.querySelector('.sort-chips');
+    if (chips) chips.parentElement.appendChild(btn);
+  }
+
+  // Inject CSS for the button
+  if (!document.getElementById('refreshStyle')) {
+    const style = document.createElement('style');
+    style.id = 'refreshStyle';
+    style.textContent = `
+      .refresh-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: rgba(0,200,150,0.08); border: 1px solid rgba(0,200,150,0.3);
+        color: #00c896; padding: 7px 14px; border-radius: 99px;
+        font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 0.8rem; font-weight: 600;
+        cursor: pointer; transition: 0.25s ease; white-space: nowrap;
+      }
+      .refresh-btn:hover { background: rgba(0,200,150,0.18); border-color: #00c896; }
+      .refresh-btn:active { transform: scale(0.96); }
+      .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(style);
+  }
+})();
+
+/* ── Column resolver — picks first matching key from a row ── */
+function col(row, field) {
+  const aliases = COL[field] || [field];
+  for (const alias of aliases) {
+    if (row[alias] !== undefined && row[alias] !== null) return row[alias];
+  }
+  return '';
+}
+
+/* ── Normalize Sheet Row → Branch Object ─────────────────── */
 function normalizeRow(row, index) {
-  const city = (row['Locality'] || '').trim();
+  const city = col(row, 'city').trim();
   const cityCoord = CITY_COORDS[city] || { lat: 24.7136, lng: 46.6753 };
-  const phone = (row['Primary phone'] || '').replace(/\s+/g, '');
-  const delivery = (row['delevery'] || '').toLowerCase() === 'yes';
-  const whatsapp = (row['whats app link'] || '').replace(/\s+/g, '') || null;
-  const maps = (row['google maps location'] || '').trim() || null;
-  const name = (row['Business name'] || '').trim();
+
+  // Lat / Lng — prefer sheet values, fall back to city center
+  const rawLat = parseFloat(col(row, 'lat'));
+  const rawLng = parseFloat(col(row, 'lng'));
+  const hasCoords = !isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0;
+
+  if (!hasCoords && col(row, 'store_code')) {
+    console.warn(`[OPH] ⚠️ No coords for ${col(row, 'store_code')} (${city}) — using city center`);
+  }
+
+  const lat = hasCoords ? rawLat : cityCoord.lat;
+  const lng = hasCoords ? rawLng : cityCoord.lng;
+  const coordSource = hasCoords ? 'sheet' : 'city-fallback';
+
+  const phone    = col(row, 'phone').replace(/\s+/g, '');
+  const delivery = col(row, 'delivery').toLowerCase() === 'yes';
+  const whatsapp = col(row, 'whatsapp').replace(/\s+/g, '') || null;
+  const maps     = col(row, 'maps').trim() || null;
+  const name     = col(row, 'business_name').trim();
 
   return {
-    _id:          index,
-    store_code:   (row['Store code'] || '').trim(),
+    _id:           index,
+    store_code:    col(row, 'store_code').trim(),
     business_name: name,
-    address1:     (row['Address line 1'] || '').trim(),
-    address2:     (row['Address line 2'] || '').trim(),
+    address1:      col(row, 'address1').trim(),
+    address2:      col(row, 'address2').trim(),
     city,
-    country:      (row['Country / Region'] || 'Saudi Arabia').trim(),
+    country:       col(row, 'country').trim() || 'Saudi Arabia',
     phone,
     delivery,
     whatsapp,
     maps,
-    lat:          cityCoord.lat,
-    lng:          cityCoord.lng,
-    dist:         null,
+    lat,
+    lng,
+    coordSource,
+    dist: null,
   };
 }
 
-/* ── Fetch Sheet ─────────────────────────────────────────── */
+/* ── Fetch (no-cache, cache-busted URL) ──────────────────── */
 async function fetchBranches() {
-  const res = await fetch(SHEET_URL);
+  // 1. Nuke any browser storage (just in case someone stored data before)
+  try { localStorage.clear(); } catch(_) {}
+  try { sessionStorage.clear(); } catch(_) {}
+
+  // 2. Cache-busted URL + fetch with cache: 'no-store'
+  const url = `${SHEET_URL}?t=${Date.now()}`;
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return data.map((row, i) => normalizeRow(row, i));
+
+  // 3. Debug diagnostics
+  const normalized = data.map((row, i) => normalizeRow(row, i));
+  const now = new Date();
+  console.group('%c[OPH] ✅ Data loaded', 'color:#00c896;font-weight:bold');
+  console.log('Branches loaded:', normalized.length);
+  console.log('First branch:', normalized[0]);
+  console.log('First branch lat:', normalized[0]?.lat, '| lng:', normalized[0]?.lng);
+  console.log('Data loaded at:', now.toISOString());
+  const fromSheet = normalized.filter(b => b.coordSource === 'sheet').length;
+  const fromCity  = normalized.filter(b => b.coordSource === 'city-fallback').length;
+  console.log(`Coord sources: ${fromSheet} from sheet, ${fromCity} from city fallback`);
+  console.groupEnd();
+
+  return { branches: normalized, loadedAt: now };
 }
 
-/* ── Haversine ───────────────────────────────────────────── */
+/* ── Haversine Distance ──────────────────────────────────── */
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -194,6 +311,12 @@ function render() {
     ? `نتائج البحث (${list.length})`
     : `جميع الفروع (${list.length})`;
   el.headerStat.textContent = state.branches.length;
+
+  // Update last-updated label
+  if (state.lastLoaded && el.lastUpdated) {
+    el.lastUpdated.textContent =
+      `آخر تحديث: ${state.lastLoaded.toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' })}`;
+  }
 }
 
 /* ── Brand helper ────────────────────────────────────────── */
@@ -210,13 +333,16 @@ function createCard(branch, isNearest) {
 
   const { color, icon } = getBrand(branch.business_name);
   const addrText = [branch.address2, branch.address1].filter(Boolean).join(' — ');
-  const distHTML = branch.dist !== null
+  const distLabel = branch.dist !== null
+    ? `${formatDist(branch.dist)}${branch.coordSource === 'city-fallback' ? ' (تقريبي)' : ''}` : null;
+
+  const distHTML = distLabel
     ? `<div class="distance-badge">
          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-         ${formatDist(branch.dist)} منك
+         ${distLabel} منك
        </div>` : '';
 
-  const dis = (ok) => ok ? '' : 'style="opacity:0.35;pointer-events:none"';
+  const dis = ok => ok ? '' : 'style="opacity:0.35;pointer-events:none"';
 
   card.innerHTML = `
     <div class="card-cover-placeholder" style="--brand-color:${color}">
@@ -262,16 +388,17 @@ function openModal(branch) {
   const { icon } = getBrand(branch.business_name);
 
   el.modalCover.textContent = icon;
-  el.modalCode.textContent = branch.store_code;
-  el.modalDelivery.textContent = branch.delivery ? '🚚 توصيل متاح' : '🚫 بدون توصيل';
-  el.modalDelivery.className = `modal-delivery-badge ${branch.delivery ? 'yes':'no'}`;
-  el.modalName.textContent = branch.business_name;
-  el.modalAddress.textContent = [branch.address1, branch.address2].filter(Boolean).join(' — ') || branch.city;
+  el.modalCode.textContent  = branch.store_code;
+  el.modalDelivery.textContent  = branch.delivery ? '🚚 توصيل متاح' : '🚫 بدون توصيل';
+  el.modalDelivery.className    = `modal-delivery-badge ${branch.delivery ? 'yes':'no'}`;
+  el.modalName.textContent      = branch.business_name;
+  el.modalAddress.textContent   = [branch.address1, branch.address2].filter(Boolean).join(' — ') || branch.city;
   el.modalCity.querySelector('span').textContent = `${branch.city} · ${branch.country}`;
 
   const distEl = el.modalDist.querySelector('span');
   if (branch.dist !== null) {
-    distEl.textContent = `على بُعد تقريبي ${formatDist(branch.dist)} من موقعك`;
+    const tag = branch.coordSource === 'city-fallback' ? ' (مسافة تقريبية)' : '';
+    distEl.textContent = `على بُعد ${formatDist(branch.dist)} من موقعك${tag}`;
     el.modalDist.style.display = '';
   } else {
     el.modalDist.style.display = 'none';
@@ -279,12 +406,12 @@ function openModal(branch) {
 
   const setBtn = (btn, href, ok) => {
     btn.href = href || '#';
-    btn.style.opacity = ok ? '' : '0.35';
+    btn.style.opacity      = ok ? '' : '0.35';
     btn.style.pointerEvents = ok ? '' : 'none';
   };
-  setBtn(el.modalCall,      `tel:${branch.phone}`, !!branch.phone);
-  setBtn(el.modalWhatsapp,  branch.whatsapp, !!branch.whatsapp);
-  setBtn(el.modalMaps,      branch.maps, !!branch.maps);
+  setBtn(el.modalCall,     `tel:${branch.phone}`, !!branch.phone);
+  setBtn(el.modalWhatsapp, branch.whatsapp, !!branch.whatsapp);
+  setBtn(el.modalMaps,     branch.maps, !!branch.maps);
 
   el.modalOverlay.hidden = false;
   document.body.style.overflow = 'hidden';
@@ -323,7 +450,7 @@ function locate() {
       if (err.code === err.PERMISSION_DENIED) {
         showStatus('❌ تم رفض إذن الموقع');
         el.denied.hidden = false;
-        el.empty.hidden = true;
+        el.empty.hidden  = true;
         el.grid.style.display = 'none';
       } else {
         showStatus('⚠️ تعذّر الحصول على الموقع');
@@ -335,13 +462,54 @@ function locate() {
 }
 
 function setLocateLoading(on) { el.locateBtn.classList.toggle('loading', on); }
-function showStatus(msg) { el.statusBar.hidden = false; el.statusInner.textContent = msg; }
+
+function showStatus(msg, autohide = 0) {
+  el.statusBar.hidden = false;
+  el.statusInner.childNodes[0]
+    ? (el.statusInner.childNodes[0].textContent = msg)
+    : el.statusInner.prepend(document.createTextNode(msg));
+  if (autohide) setTimeout(() => { el.statusBar.hidden = true; }, autohide);
+}
+
 function scrollToBranches() {
   document.querySelector('.branches-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/* ── Buttons ─────────────────────────────────────────────── */
-[el.locateBtn, el.heroLocateBtn, el.floatNearest, el.mbarLocate].forEach(b => b && b.addEventListener('click', locate));
+/* ── Refresh Data ────────────────────────────────────────── */
+async function refreshData() {
+  if (!el.refreshBtn) return;
+  el.refreshBtn.classList.add('spinning');
+  el.refreshBtn.disabled = true;
+  showStatus('🔄 جارٍ تحديث البيانات من الشيت...');
+
+  try {
+    const { branches, loadedAt } = await fetchBranches();
+    state.branches   = branches;
+    state.lastLoaded = loadedAt;
+
+    // Re-compute distances with existing user location (if any)
+    computeDistances();
+    render();
+
+    showStatus(`✅ تم تحديث البيانات — ${branches.length} فرع`, 5000);
+  } catch (err) {
+    console.error('[OPH] Refresh failed:', err);
+    showStatus('⚠️ فشل التحديث — تحقق من الاتصال', 6000);
+  } finally {
+    el.refreshBtn.classList.remove('spinning');
+    el.refreshBtn.disabled = false;
+  }
+}
+
+/* ── Wire up Refresh button (created or existing) ────────── */
+document.addEventListener('click', e => {
+  if (e.target.closest('#refreshBtn')) refreshData();
+});
+
+/* ── Locate buttons ──────────────────────────────────────── */
+[el.locateBtn, el.heroLocateBtn, el.floatNearest, el.mbarLocate]
+  .forEach(b => b && b.addEventListener('click', locate));
+
 el.mbarAll && el.mbarAll.addEventListener('click', () => {
   state.query = ''; el.searchInput.value = ''; el.clearSearch.hidden = true;
   computeDistances(); render(); scrollToBranches();
@@ -371,15 +539,15 @@ function updateChips() {
   document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.sort === state.sortMode));
 }
 
-/* ── Retry ───────────────────────────────────────────────── */
+/* ── Retry (location denied) ─────────────────────────────── */
 $('retryBtn') && $('retryBtn').addEventListener('click', () => {
   el.denied.hidden = true; el.grid.style.display = ''; locate();
 });
 
-/* ── Float button reveal on scroll ──────────────────────── */
+/* ── Float button on scroll ──────────────────────────────── */
 window.addEventListener('scroll', () => {
-  const show = window.scrollY > document.querySelector('.hero').offsetHeight * 0.4;
-  el.floatNearest.style.opacity = show ? '1' : '0';
+  const show = window.scrollY > (document.querySelector('.hero')?.offsetHeight || 400) * 0.4;
+  el.floatNearest.style.opacity      = show ? '1' : '0';
   el.floatNearest.style.pointerEvents = show ? '' : 'none';
 }, { passive: true });
 
@@ -394,6 +562,7 @@ function observeReveal() {
 /* ── Particles ───────────────────────────────────────────── */
 function initParticles() {
   const canvas = $('particles');
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
   resize();
@@ -442,9 +611,12 @@ function initParticles() {
 /* ── Keyboard nav ────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (!document.activeElement.classList.contains('branch-card')) return;
-  const dir = ['ArrowDown','ArrowRight'].includes(e.key) ? 'next' : ['ArrowUp','ArrowLeft'].includes(e.key) ? 'prev' : null;
+  const dir = ['ArrowDown','ArrowRight'].includes(e.key) ? 'next'
+             : ['ArrowUp','ArrowLeft'].includes(e.key)   ? 'prev' : null;
   if (!dir) return;
-  const sib = dir === 'next' ? document.activeElement.nextElementSibling : document.activeElement.previousElementSibling;
+  const sib = dir === 'next'
+    ? document.activeElement.nextElementSibling
+    : document.activeElement.previousElementSibling;
   if (sib?.classList.contains('branch-card')) sib.focus();
 });
 
@@ -453,32 +625,34 @@ async function init() {
   el.skeleton.style.display = '';
   el.grid.style.display = 'none';
   el.headerStat.textContent = '…';
-  el.floatNearest.style.opacity = '0';
-  el.floatNearest.style.transition = 'opacity 0.4s ease';
+  if (el.floatNearest) {
+    el.floatNearest.style.opacity = '0';
+    el.floatNearest.style.transition = 'opacity 0.4s ease';
+  }
 
   try {
-    const fetched = await fetchBranches();
-    state.branches = fetched;
+    const { branches, loadedAt } = await fetchBranches();
+    state.branches   = branches;
+    state.lastLoaded = loadedAt;
     computeDistances();
 
     setTimeout(() => {
-      el.overlay.classList.add('hidden');
+      el.overlay?.classList.add('hidden');
       render();
-      document.querySelector('.map-section').classList.add('reveal');
-      document.querySelector('.section-header').classList.add('reveal');
+      document.querySelector('.map-section')?.classList.add('reveal');
+      document.querySelector('.section-header')?.classList.add('reveal');
       observeReveal();
       initParticles();
-      showStatus(`✅ تم تحميل ${state.branches.length} فرع`);
-      setTimeout(() => { el.statusBar.hidden = true; }, 4000);
+      showStatus(`✅ تم تحميل ${branches.length} فرع`, 5000);
     }, 1400);
 
   } catch (err) {
-    console.error('Sheet fetch error:', err);
-    el.overlay.classList.add('hidden');
+    console.error('[OPH] Init fetch error:', err);
+    el.overlay?.classList.add('hidden');
     el.skeleton.style.display = 'none';
     el.grid.style.display = 'none';
     el.empty.hidden = false;
-    showStatus('⚠️ تعذّر تحميل البيانات من الشيت — تحقق من الاتصال');
+    showStatus('⚠️ تعذّر تحميل البيانات — تحقق من الاتصال');
     initParticles();
   }
 }
