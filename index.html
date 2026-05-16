@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="صيدلية أوشن — اعثر على أقرب فرع إليك في الرياض. خدمة توصيل، واتساب، وخرائط تفاعلية." />
+  <meta name="theme-color" content="#1a8fbb" />
+  <title>صيدلية أوشن | أقرب فرع إليك</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='url(%23g)'/><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231a8fbb'/><stop offset='1' stop-color='%234caf50'/></linearGradient></defs><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='20' fill='white'>⚕</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@400;500;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loader-inner">
+      <div class="loader-logo">
+        <div class="loader-icon">⚕</div>
+        <span class="loader-brand">أوشن</span>
+      </div>
+      <div class="loader-bar"><div class="loader-progress"></div></div>
+      <p class="loader-text">جارٍ تحميل الفروع...</p>
+    </div>
+  </div>
+
+  <!-- Particles Canvas -->
+  <canvas id="particles" aria-hidden="true"></canvas>
+
+  <!-- Floating WhatsApp Support -->
+  <a href="https://wa.me/966582763186" target="_blank" rel="noopener" class="float-whatsapp" aria-label="تواصل عبر واتساب">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  </a>
+
+  <!-- Floating Find Nearest -->
+  <button id="floatNearest" class="float-nearest" aria-label="أقرب فرع">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
+    <span>أقرب فرع</span>
+  </button>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-mark">⚕</div>
+        <div class="logo-text">
+          <span class="logo-name">صيدلية أوشن</span>
+          <span class="logo-tagline">Ocean Pharmacy</span>
+        </div>
+      </div>
+      <div class="header-stat" id="headerStat">
+        <span id="branchCount">—</span>
+        <span>فرع</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero" aria-label="قسم البطل">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        مفتوح الآن · نخدمك في الرياض
+      </div>
+      <h1 class="hero-title">اعثر على أقرب<br/><em>فرع أوشن</em> إليك</h1>
+      <p class="hero-sub">خدمة توصيل · استشارة صيدلانية · ساعات عمل مرنة</p>
+      <button class="btn-glow" id="heroLocateBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        تحديد موقعي الآن
+      </button>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hero-ring r1"></div>
+      <div class="hero-ring r2"></div>
+      <div class="hero-ring r3"></div>
+      <div class="hero-cross">⚕</div>
+      <!-- Decorative drops matching the logo -->
+      <div class="hero-drop hero-drop1"></div>
+      <div class="hero-drop hero-drop2"></div>
+      <div class="hero-drop hero-drop3"></div>
+    </div>
+  </section>
+
+  <!-- Sticky Search -->
+  <div class="search-bar-wrap" id="searchBarWrap">
+    <div class="search-inner">
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" id="searchInput" placeholder="ابحث بالحي أو المدينة..." aria-label="بحث الفروع" autocomplete="off" />
+        <button id="clearSearch" class="clear-btn" aria-label="مسح البحث" hidden>✕</button>
+      </div>
+      <button class="locate-btn" id="locateBtn" aria-label="تحديد الموقع">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        <span class="locate-label">موقعي</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Link Locator -->
+  <section class="link-locator" aria-label="معرفة أقرب فرع من رابط خرائط">
+    <div class="link-locator-inner">
+      <div class="link-locator-title">
+        <span class="link-locator-icon">🔗</span>
+        <div>
+          <h2>اعرف أقرب فرع من رابط موقع</h2>
+          <p>انسخ رابط Google Maps أو الإحداثيات وسيتم ترتيب الفروع حسب أقرب فرع لهذا الموقع.</p>
+        </div>
+      </div>
+      <div class="link-locator-actions">
+        <div class="map-link-box">
+          <input type="text" id="mapLinkInput" placeholder="الصق رابط Google Maps أو 24.7136,46.6753" autocomplete="off" />
+          <button id="clearMapLink" class="clear-btn map-clear" aria-label="مسح رابط الموقع" hidden>✕</button>
+        </div>
+        <button class="link-paste-btn" id="pasteMapLinkBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          لصق
+        </button>
+        <button class="locate-btn link-find-btn" id="findNearestFromLinkBtn" type="button">معرفة الأقرب</button>
+      </div>
+      <div class="link-result" id="linkResult" hidden></div>
+    </div>
+  </section>
+
+  <!-- Status Bar -->
+  <div class="status-bar" id="statusBar" hidden>
+    <div class="status-inner" id="statusInner"></div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Map Placeholder -->
+    <section class="map-section" id="mapSection">
+      <div class="map-placeholder">
+        <div class="map-overlay-text">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>قريباً · خريطة تفاعلية</span>
+        </div>
+        <div class="map-pins" aria-hidden="true">
+          <div class="map-pin p1"><div class="pin-pulse"></div></div>
+          <div class="map-pin p2"><div class="pin-pulse"></div></div>
+          <div class="map-pin p3"><div class="pin-pulse"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Branches Section -->
+    <section class="branches-section" aria-label="قائمة الفروع">
+      <div class="section-header">
+        <h2 class="section-title" id="sectionTitle">جميع الفروع</h2>
+        <div class="sort-chips">
+          <button class="chip active" data-sort="default">الافتراضي</button>
+          <button class="chip" data-sort="distance">الأقرب أولاً</button>
+          <button class="chip" data-sort="delivery">التوصيل</button>
+        </div>
+      </div>
+
+      <!-- Skeleton Loading -->
+      <div class="branches-grid" id="skeletonGrid" aria-hidden="true">
+        <div class="skeleton-card"><div class="sk-img"></div><div class="sk-line l1"></div><div class="sk-line l2"></div><div class="sk-line l3"></div></div>
+        <div class="skeleton-card"><div class="sk-img"></div><div class="sk-line l1"></div><div class="sk-line l2"></div><div class="sk-line l3"></div></div>
+        <div class="skeleton-card"><div class="sk-img"></div><div class="sk-line l1"></div><div class="sk-line l2"></div><div class="sk-line l3"></div></div>
+      </div>
+
+      <!-- Branches Grid -->
+      <div class="branches-grid" id="branchesGrid" role="list"></div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-icon">🔍</div>
+        <h3>لا توجد نتائج</h3>
+        <p>جرّب البحث بكلمة مختلفة أو تصفّح جميع الفروع</p>
+        <button class="btn-outline" id="clearSearchBtn">عرض جميع الفروع</button>
+      </div>
+
+      <!-- Permission Denied -->
+      <div class="permission-denied" id="permissionDenied" hidden>
+        <div class="denied-icon">📍</div>
+        <h3>تعذّر الوصول للموقع</h3>
+        <p>يبدو أن إذن الموقع محجوب. يمكنك تفعيله من إعدادات المتصفح.</p>
+        <button class="btn-glow sm" id="retryBtn">إعادة المحاولة</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalName" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="modalClose" aria-label="إغلاق">✕</button>
+      <div class="modal-header">
+        <div class="modal-cover" id="modalCover"></div>
+        <div class="modal-badge-row">
+          <span class="modal-code" id="modalCode"></span>
+          <span class="modal-delivery-badge" id="modalDelivery"></span>
+        </div>
+        <h2 class="modal-name" id="modalName"></h2>
+        <p class="modal-address" id="modalAddress"></p>
+      </div>
+      <div class="modal-body">
+        <div class="modal-detail" id="modalCity">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span></span>
+        </div>
+        <div class="modal-detail" id="modalDist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <a id="modalCall" href="#" class="modal-btn call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.84a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          اتصال
+        </a>
+        <a id="modalWhatsapp" href="#" target="_blank" rel="noopener" class="modal-btn whatsapp">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          واتساب
+        </a>
+        <a id="modalMaps" href="#" target="_blank" rel="noopener" class="modal-btn maps">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          خرائط
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-logo">⚕ صيدلية أوشن · Ocean Pharmacy</div>
+      <p class="footer-copy">جميع الحقوق محفوظة © 2025 — Ocean Pharmacy KSA</p>
+    </div>
+  </footer>
+
+  <!-- Mobile Bottom Bar -->
+  <div class="mobile-bar" id="mobileBar">
+    <button class="mbar-btn" id="mbarLocate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      <span>موقعي</span>
+    </button>
+    <button class="mbar-btn" id="mbarAll">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>الفروع</span>
+    </button>
+    <a href="https://wa.me/966582763186" target="_blank" rel="noopener" class="mbar-btn mbar-wa">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      <span>واتساب</span>
+    </a>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
